@@ -5,6 +5,9 @@
 #define BITS_PER_SAMPLE 16
 #define CHANNELS 1
 
+
+//Modificado por: Paula Carreño 202320149 y Juan Andrés Moreno 202321829
+
 #pragma pack(push, 1)
 typedef struct {
     char           riff[4];        /* "RIFF" */
@@ -133,6 +136,31 @@ void generate_tone(short* out, int nSamples, unsigned int freqHz, short amp) {
     }
 
 }
+
+
+
+// TRADUCCIÓN DE generate_tone a ensamblador:
+
+__declspec(naked) void generate_tone_asm(short* out, int nSamples, unsigned int freqHz, unsigned short amp)
+{
+    __asm {
+        
+        push ebp
+        mov ebp, esp
+        sub esp, 20
+
+        mov dword ptr [ebp-4], 0   ; phase = 0
+        push dword ptr [ebp+16]  ; freqHz
+        call freq_to_phaseStep ; phaseStep = freq_to_phaseStep(freqHz)
+        add esp, 4 ; limpiar la pila
+        mov dword ptr [ebp-8], eax ; guardar phaseStep
+        mov dword ptr [ebp-16], 0 ; i = 0
+
+
+
+    }
+}
+
 
 static int parse_positive_int(const char* s) {
     int v = 0;
