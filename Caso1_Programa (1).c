@@ -140,26 +140,62 @@ void generate_tone(short* out, int nSamples, unsigned int freqHz, short amp) {
 
 
 // TRADUCCIÓN DE generate_tone a ensamblador:
-
 __declspec(naked) void generate_tone_asm(short* out, int nSamples, unsigned int freqHz, unsigned short amp)
 {
-    __asm {
-        
-        push ebp
-        mov ebp, esp
-        sub esp, 20
+    __asm__ __volatile__(
 
-        mov dword ptr [ebp-4], 0   ; phase = 0
-        push dword ptr [ebp+16]  ; freqHz
-        call freq_to_phaseStep ; phaseStep = freq_to_phaseStep(freqHz)
-        add esp, 4 ; limpiar la pila
-        mov dword ptr [ebp-8], eax ; guardar phaseStep
-        mov dword ptr [ebp-16], 0 ; i = 0
+        ".intel_syntax noprefix\n"
 
+        "push ebp\n"
+        "mov ebp, esp\n"
+        "sub esp, 20\n"
 
+        "mov dword ptr [ebp-4], 0\n"        // phase = 0
+        "push dword ptr [ebp+16]\n"         // freqHz
+        "call freq_to_phaseStep\n"          // phaseStep = freq_to_phaseStep(freqHz)
+        "add esp, 4\n"                      // limpiar la pila
+        "mov dword ptr [ebp-8], eax\n"      // guardar phaseStep
+        "mov dword ptr [ebp-16], 0\n"       // i = 0
 
-    }
+        "inicio_loop:\n"
+
+        "mov eax, dword ptr [ebp-16]\n"     // i
+        "cmp eax, dword ptr [ebp+12]\n"     // comparar i con nSamples
+        "jge fin_loop\n"                    // si i >= nSamples, salir del loop
+
+        "mov eax, dword ptr [ebp-4]\n"      // phase
+        "shr eax, 24\n"                     // index = phase >> 24
+
+        "movsx ecx, word ptr [sineTable + eax*2]\n"   // ecx = sineTable[index]
+        "movzx edx, word ptr [ebp+20]\n"              // amp
+
+        "imul ecx, edx\n"                   // ecx = ecx * edx
+
+        "mov dword ptr [ebp-12], ecx\n"     // guardar temp
+
+        "sar ecx, 15\n"                     // sample = temp >> 15; sar es desplazamiento aritmético
+
+        "mov edx, dword ptr [ebp+8]\n"      // out
+        "mov eax, dword ptr [ebp-16]\n"     // i
+        "mov word ptr [edx + eax*2], cx\n"
+
+        "mov eax, dword ptr [ebp-4]\n"      // phase
+        "add eax, dword ptr [ebp-8]\n"      // phase += phaseStep
+        "mov dword ptr [ebp-4], eax\n"      // guardar phase
+
+        "inc dword ptr [ebp-16]\n"          // i++
+        "jmp inicio_loop\n"
+
+        "fin_loop:\n"
+
+        "mov esp, ebp\n"
+        "pop ebp\n"
+        "ret\n"
+
+        ".att_syntax\n"
+    );
 }
+
 
 
 static int parse_positive_int(const char* s) {
